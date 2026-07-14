@@ -1,0 +1,1887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledger — Monthly Budget Book</title>
+<meta name="description" content="Track custom budget categories, expenses, income, and recurring bills.">
+<meta name="theme-color" content="#2F5D50">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ledger">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #EFEAD9;
+    --paper-raised: #F7F3E6;
+    --ink: #1F2E28;
+    --ink-soft: #4C5A54;
+    --ledger: #2F5D50;
+    --ledger-dark: #24463C;
+    --brass: #A9832E;
+    --brass-dark: #8A6A22;
+    --brass-soft: #D8C48F;
+    --rule: #C9C2AC;
+    --rule-strong: #A79E82;
+    --danger: #A33B2D;
+    --danger-soft: #F1DBD4;
+    --good: #2F5D50;
+    --good-soft: #DCE7DF;
+    --shadow: 0 1px 0 rgba(31,46,40,0.06), 0 6px 16px rgba(31,46,40,0.06);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      repeating-linear-gradient(180deg, transparent, transparent 37px, rgba(169,131,46,0.07) 38px),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+    padding-bottom:80px;
+  }
+
+  ::selection{ background:var(--brass-soft); }
+
+  /* ---------- Header ---------- */
+  header{
+    padding:38px 6vw 22px;
+    border-bottom:2px solid var(--ink);
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:18px;
+  }
+  .wordmark{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size:clamp(32px, 4vw, 46px);
+    letter-spacing:-0.01em;
+    color:var(--ink);
+    display:flex;
+    align-items:baseline;
+    gap:14px;
+  }
+  .wordmark small{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+    font-weight:500;
+    color:var(--brass);
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+  }
+  .header-right{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+  .today-ticker{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    letter-spacing:0.03em;
+  }
+  .today-ticker span{ color:var(--ink); font-weight:600; }
+
+  .month-picker{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+  }
+  .month-picker label{ color:var(--ink-soft); }
+  input[type="month"]{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13px;
+    border:1.5px solid var(--ink);
+    background:var(--paper-raised);
+    color:var(--ink);
+    padding:6px 10px;
+    border-radius:3px;
+  }
+
+  #installBtn{ display:none; }
+
+  /* ---------- Ledger totals strip ---------- */
+  .totals{
+    margin:26px 6vw 0;
+    display:grid;
+    grid-template-columns:repeat(5, 1fr);
+    border:1.5px solid var(--ink);
+    border-radius:6px;
+    overflow:hidden;
+    background:var(--paper-raised);
+  }
+  .totals .cell{
+    padding:16px 18px;
+    border-right:1.5px solid var(--rule-strong);
+  }
+  .totals .cell:last-child{ border-right:none; }
+  .totals .label{
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    color:var(--ink-soft);
+    margin-bottom:6px;
+    font-weight:600;
+  }
+  .totals .value{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:22px;
+    font-weight:600;
+    color:var(--ink);
+  }
+  .totals .cell.remaining .value.negative,
+  .totals .cell.net .value.negative{ color:var(--danger); }
+  .totals .cell.remaining .value.positive,
+  .totals .cell.net .value.positive{ color:var(--good); }
+  .totals .cell.income .value{ color:var(--brass-dark); }
+
+  /* ---------- Toolbar ---------- */
+  .toolbar{
+    margin:22px 6vw 8px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  .toolbar-left, .toolbar-right{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  button{
+    font-family:'Inter', sans-serif;
+    cursor:pointer;
+    border-radius:4px;
+    border:1.5px solid var(--ink);
+    background:transparent;
+    color:var(--ink);
+    font-weight:600;
+    font-size:13.5px;
+    padding:10px 18px;
+    transition:background .15s ease, color .15s ease, transform .05s ease;
+  }
+  button:active{ transform:translateY(1px); }
+  button.primary{
+    background:var(--ledger);
+    border-color:var(--ledger);
+    color:#fff;
+  }
+  button.primary:hover{ background:var(--ledger-dark); }
+  button.income-btn{
+    background:var(--brass);
+    border-color:var(--brass);
+    color:#fff;
+  }
+  button.income-btn:hover{ background:var(--brass-dark); }
+  button.ghost:hover{ background:var(--paper-raised); }
+  button.small{
+    padding:5px 10px;
+    font-size:12px;
+    border-radius:3px;
+  }
+  button.danger-text{
+    border:none;
+    color:var(--danger);
+    background:none;
+    padding:4px 6px;
+    font-weight:600;
+    text-decoration:underline;
+    text-underline-offset:2px;
+  }
+  button.link{
+    border:none;
+    background:none;
+    color:var(--brass);
+    font-weight:600;
+    padding:2px 0;
+    text-decoration:underline;
+    text-underline-offset:3px;
+  }
+  button:disabled{ opacity:0.45; cursor:not-allowed; }
+
+  /* ---------- Section headers ---------- */
+  .section-heading{
+    margin:30px 6vw 10px;
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+  }
+  .section-heading h2{
+    font-family:'Fraunces', serif;
+    font-size:20px;
+    font-weight:600;
+    margin:0;
+  }
+  .section-heading .section-sub{
+    font-size:12px;
+    color:var(--ink-soft);
+  }
+
+  /* ---------- Category grids (expense + income) ---------- */
+  .grid{
+    margin:0 6vw 8px;
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(310px, 1fr));
+    gap:20px;
+  }
+
+  .empty-state{
+    margin:24px 6vw 40px;
+    text-align:center;
+    color:var(--ink-soft);
+    font-family:'Fraunces', serif;
+    font-size:17px;
+    padding:26px;
+    border:1.5px dashed var(--rule-strong);
+    border-radius:8px;
+  }
+  .empty-state .sub{
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+    margin-top:6px;
+    color:var(--ink-soft);
+  }
+
+  .card{
+    position:relative;
+    background:var(--paper-raised);
+    border:1.5px solid var(--ink);
+    border-radius:8px;
+    box-shadow:var(--shadow);
+    padding:20px 22px 16px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+  .card.income-type{ border-top:4px solid var(--brass); }
+  .card::before{
+    content:"";
+    position:absolute;
+    left:-1.5px; top:14px; bottom:14px;
+    width:0;
+    border-left:2px dashed var(--rule-strong);
+  }
+  .card-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:8px;
+  }
+  .cat-name{
+    font-family:'Fraunces', serif;
+    font-size:21px;
+    font-weight:600;
+    color:var(--ink);
+    word-break:break-word;
+  }
+  .cat-actions{
+    display:flex;
+    gap:6px;
+    flex-shrink:0;
+  }
+  .icon-btn{
+    border:1px solid var(--rule-strong);
+    background:transparent;
+    color:var(--ink-soft);
+    font-size:12px;
+    padding:4px 8px;
+    border-radius:3px;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .icon-btn:hover{ background:var(--paper); color:var(--ink); }
+
+  .amount-row{
+    display:flex;
+    justify-content:space-between;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:13.5px;
+    color:var(--ink-soft);
+  }
+  .amount-row b{
+    color:var(--ink);
+    font-size:15px;
+  }
+
+  .ruler{
+    position:relative;
+    height:14px;
+    background:repeating-linear-gradient(90deg, var(--rule) 0, var(--rule) 1px, transparent 1px, transparent 10px);
+    border:1px solid var(--rule-strong);
+    border-radius:3px;
+    overflow:hidden;
+  }
+  .ruler-fill{
+    position:absolute;
+    left:0; top:0; bottom:0;
+    background:var(--ledger);
+    transition:width .25s ease;
+  }
+  .ruler-fill.over{ background:var(--danger); }
+  .ruler-fill.goal{ background:var(--brass); }
+
+  .remaining-line{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:12.5px;
+    color:var(--ink-soft);
+  }
+  .remaining-line .amt{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:700;
+    font-size:14px;
+  }
+  .remaining-line .amt.positive{ color:var(--good); }
+  .remaining-line .amt.negative{ color:var(--danger); }
+  .remaining-line .amt.goal-met{ color:var(--brass-dark); }
+
+  .stamp{
+    position:absolute;
+    top:14px; right:16px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:10px;
+    font-weight:700;
+    letter-spacing:0.08em;
+    border-radius:3px;
+    padding:2px 6px;
+    transform:rotate(4deg);
+  }
+  .stamp.over{
+    color:var(--danger);
+    border:1.5px solid var(--danger);
+    background:var(--danger-soft);
+  }
+  .stamp.met{
+    color:var(--brass-dark);
+    border:1.5px solid var(--brass);
+    background:var(--brass-soft);
+  }
+
+  .toggle-entries{
+    align-self:flex-start;
+    margin-top:2px;
+  }
+
+  .entries{
+    border-top:1px dashed var(--rule-strong);
+    margin-top:6px;
+    padding-top:10px;
+    display:none;
+    flex-direction:column;
+    gap:8px;
+    max-height:260px;
+    overflow-y:auto;
+  }
+  .entries.open{ display:flex; }
+  .entry-row{
+    display:grid;
+    grid-template-columns:70px 1fr auto;
+    align-items:start;
+    gap:8px;
+    font-size:12.5px;
+    padding:4px 2px;
+    border-radius:3px;
+  }
+  .entry-row:hover{ background:var(--paper); }
+  .entry-date{ font-family:'IBM Plex Mono', monospace; color:var(--ink-soft); padding-top:1px; }
+  .entry-note-wrap{ min-width:0; }
+  .entry-note{ color:var(--ink); font-weight:500; }
+  .entry-note .recur-badge{
+    font-size:10px;
+    color:var(--brass);
+    border:1px solid var(--brass-soft);
+    background:var(--good-soft);
+    border-radius:3px;
+    padding:0 4px;
+    margin-left:5px;
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:600;
+  }
+  .entry-details{
+    color:var(--ink-soft);
+    font-style:italic;
+    font-size:12px;
+    margin-top:2px;
+    word-break:break-word;
+  }
+  .entry-amt{ font-family:'IBM Plex Mono', monospace; font-weight:600; padding-top:1px; white-space:nowrap; }
+  .entry-amt.income{ color:var(--brass-dark); }
+  .entry-actions{
+    display:flex;
+    gap:4px;
+    align-items:flex-start;
+  }
+  .entry-edit, .entry-del{
+    border:1px solid transparent;
+    background:none;
+    font-size:12.5px;
+    cursor:pointer;
+    padding:2px 5px;
+    border-radius:3px;
+    line-height:1.4;
+  }
+  .entry-edit{ color:var(--ink-soft); }
+  .entry-edit:hover{ color:var(--ink); background:var(--paper); border-color:var(--rule-strong); }
+  .entry-del{ color:var(--ink-soft); }
+  .entry-del:hover{ color:var(--danger); background:var(--danger-soft); border-color:var(--danger); }
+  .no-entries{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    font-style:italic;
+    padding:4px 2px;
+  }
+
+  /* ---------- Modal ---------- */
+  .overlay{
+    position:fixed; inset:0;
+    background:rgba(31,46,40,0.45);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:50;
+    padding:20px;
+    overflow-y:auto;
+  }
+  .overlay.open{ display:flex; }
+  .modal{
+    background:var(--paper-raised);
+    border:1.5px solid var(--ink);
+    border-radius:8px;
+    width:100%;
+    max-width:440px;
+    padding:26px 26px 22px;
+    box-shadow:0 20px 50px rgba(0,0,0,0.25);
+    margin:auto;
+  }
+  .modal h2{
+    font-family:'Fraunces', serif;
+    font-size:24px;
+    margin:0 0 18px;
+    font-weight:600;
+  }
+  .field{
+    margin-bottom:16px;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .field label{
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:0.07em;
+    font-weight:600;
+    color:var(--ink-soft);
+  }
+  .field .hint{
+    font-size:11.5px;
+    color:var(--ink-soft);
+    font-weight:400;
+    text-transform:none;
+    letter-spacing:0;
+  }
+  .field input, .field select, .field textarea{
+    font-family:'Inter', sans-serif;
+    font-size:14.5px;
+    padding:10px 12px;
+    border:1.5px solid var(--rule-strong);
+    border-radius:4px;
+    background:#fff;
+    color:var(--ink);
+    width:100%;
+  }
+  .field input:disabled{
+    background:var(--paper);
+    color:var(--ink-soft);
+    font-family:'IBM Plex Mono', monospace;
+    border-style:dashed;
+  }
+  .field textarea{ resize:vertical; min-height:56px; font-family:'Inter', sans-serif; }
+  .field input:focus, .field select:focus, .field textarea:focus{
+    outline:2px solid var(--brass);
+    outline-offset:1px;
+    border-color:var(--brass);
+  }
+  .modal-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin-top:20px;
+  }
+  .field-error{
+    color:var(--danger);
+    font-size:12px;
+    display:none;
+  }
+  .field-error.show{ display:block; }
+
+  .checkbox-row{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    margin-bottom:14px;
+    cursor:pointer;
+  }
+  .checkbox-row input[type="checkbox"]{
+    width:16px; height:16px;
+    accent-color:var(--ledger);
+  }
+  .checkbox-row span{
+    font-size:14px;
+    font-weight:600;
+  }
+
+  .recurring-fields{
+    display:none;
+    border:1.5px dashed var(--brass);
+    background:var(--good-soft);
+    border-radius:6px;
+    padding:14px 14px 2px;
+    margin-bottom:16px;
+  }
+  .recurring-fields.open{ display:block; }
+  .recurring-fields .row2{
+    display:grid;
+    grid-template-columns:1fr 1.4fr;
+    gap:10px;
+  }
+
+  .type-toggle{
+    display:flex;
+    border:1.5px solid var(--ink);
+    border-radius:5px;
+    overflow:hidden;
+  }
+  .type-toggle button{
+    flex:1;
+    border:none;
+    border-radius:0;
+    background:var(--paper-raised);
+    color:var(--ink-soft);
+    font-size:13px;
+    padding:9px 10px;
+  }
+  .type-toggle button + button{ border-left:1.5px solid var(--ink); }
+  .type-toggle button.active{
+    background:var(--ledger);
+    color:#fff;
+  }
+  .type-toggle button.active[data-type="income"]{
+    background:var(--brass);
+  }
+
+  .chip-input-row{
+    display:flex;
+    gap:8px;
+  }
+  .chip-input-row input{ flex:1; }
+  .chip-list{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-top:10px;
+  }
+  .chip{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    background:var(--paper);
+    border:1px solid var(--rule-strong);
+    border-radius:14px;
+    padding:4px 6px 4px 12px;
+    font-size:12.5px;
+  }
+  .chip button{
+    border:none;
+    background:none;
+    color:var(--ink-soft);
+    font-size:13px;
+    padding:0 4px;
+    cursor:pointer;
+    border-radius:50%;
+  }
+  .chip button:hover{ color:var(--danger); }
+
+  .recurring-list{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    max-height:38vh;
+    overflow-y:auto;
+  }
+  .recurring-item{
+    border:1.5px solid var(--rule-strong);
+    border-radius:6px;
+    padding:12px 14px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    background:var(--paper);
+  }
+  .recurring-item .ri-main{ min-width:0; }
+  .recurring-item .ri-cat{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size:15.5px;
+  }
+  .recurring-item .ri-meta{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px;
+    color:var(--ink-soft);
+    margin-top:3px;
+  }
+  .recurring-item .ri-note{
+    font-size:12px;
+    color:var(--ink-soft);
+    margin-top:2px;
+    font-style:italic;
+  }
+
+  .toast{
+    position:fixed;
+    bottom:22px;
+    left:50%;
+    transform:translateX(-50%) translateY(12px);
+    background:var(--ink);
+    color:var(--paper);
+    font-size:13px;
+    font-weight:600;
+    padding:10px 18px;
+    border-radius:6px;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .2s ease, transform .2s ease;
+    z-index:100;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  @media (max-width: 900px){
+    .totals{ grid-template-columns:repeat(2, 1fr); }
+    .totals .cell:nth-child(2n){ border-right:none; }
+    .totals .cell{ border-bottom:1.5px solid var(--rule-strong); }
+  }
+  @media (max-width: 640px){
+    header{ padding:28px 5vw 18px; }
+    .toolbar, .grid, .section-heading, .empty-state{ margin-left:5vw; margin-right:5vw; }
+    .toolbar{ flex-direction:column; align-items:stretch; }
+    .toolbar-right{ justify-content:flex-end; }
+    .recurring-fields .row2{ grid-template-columns:1fr; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition:none !important; }
+  }
+
+  :focus-visible{ outline:2px solid var(--brass); outline-offset:2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wordmark">Ledger <small>Monthly Budget Book</small></div>
+  <div class="header-right">
+    <div class="today-ticker">Today — <span id="todayLabel"></span></div>
+    <div class="month-picker">
+      <label for="monthInput">Viewing</label>
+      <input type="month" id="monthInput">
+    </div>
+    <button class="ghost" id="installBtn">⭳ Install app</button>
+  </div>
+</header>
+
+<div class="totals">
+  <div class="cell">
+    <div class="label">Budgeted this month</div>
+    <div class="value" id="totalBudget">$0.00</div>
+  </div>
+  <div class="cell">
+    <div class="label">Spent this month</div>
+    <div class="value" id="totalSpent">$0.00</div>
+  </div>
+  <div class="cell remaining">
+    <div class="label">Budget remaining</div>
+    <div class="value" id="totalRemaining">$0.00</div>
+  </div>
+  <div class="cell income">
+    <div class="label">Income this month</div>
+    <div class="value" id="totalIncome">$0.00</div>
+  </div>
+  <div class="cell net">
+    <div class="label">Net (income − spent)</div>
+    <div class="value" id="totalNet">$0.00</div>
+  </div>
+</div>
+
+<div class="toolbar">
+  <div class="toolbar-left">
+    <button class="primary" id="openExpenseModal">+ Log an expense</button>
+    <button class="income-btn" id="openIncomeModal">+ Log income</button>
+  </div>
+  <div class="toolbar-right">
+    <button class="ghost" id="openCategoryModal">+ New category</button>
+    <button class="ghost" id="openRecurringModal">↻ Recurring</button>
+  </div>
+</div>
+
+<div class="section-heading">
+  <h2>Expense categories</h2>
+  <span class="section-sub">what you're spending</span>
+</div>
+<div class="grid" id="expenseGrid"></div>
+<div class="empty-state" id="expenseEmptyState" style="display:none;">
+  No expense categories yet.
+  <div class="sub">Click "New category" and choose "Expense" to start tracking a budget.</div>
+</div>
+
+<div class="section-heading">
+  <h2>Income categories</h2>
+  <span class="section-sub">what's coming in</span>
+</div>
+<div class="grid" id="incomeGrid"></div>
+<div class="empty-state" id="incomeEmptyState" style="display:none;">
+  No income categories yet.
+  <div class="sub">Click "New category" and choose "Income" to start tracking where your money comes from.</div>
+</div>
+
+<!-- Category Modal -->
+<div class="overlay" id="categoryOverlay">
+  <div class="modal">
+    <h2 id="categoryModalTitle">New category</h2>
+    <form id="categoryForm">
+      <input type="hidden" id="categoryEditId">
+      <div class="field">
+        <label>Category type</label>
+        <div class="type-toggle" id="categoryTypeToggle">
+          <button type="button" class="type-btn active" data-type="expense">Expense</button>
+          <button type="button" class="type-btn" data-type="income">Income</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="categoryName">Category name</label>
+        <input type="text" id="categoryName" placeholder="e.g. Groceries" required maxlength="40">
+      </div>
+      <div class="field">
+        <label for="categoryBudget" id="categoryBudgetLabel">Monthly budget</label>
+        <input type="number" id="categoryBudget" placeholder="0.00" min="0" step="0.01" required>
+        <span class="hint" id="categoryBudgetHint">How much you plan to spend in this category each month.</span>
+      </div>
+      <div class="field">
+        <label for="categoryNoteInput">Notes for this category's dropdown <span class="hint">— optional, add as many as you like</span></label>
+        <div class="chip-input-row">
+          <input type="text" id="categoryNoteInput" placeholder="e.g. Trader Joe's" maxlength="40">
+          <button type="button" class="ghost small" id="addCategoryNote">Add</button>
+        </div>
+        <div class="chip-list" id="categoryNoteChips"></div>
+      </div>
+      <div class="field-error" id="categoryError">Enter a name and a budget of $0 or more.</div>
+      <div class="modal-actions">
+        <button type="button" class="ghost" id="cancelCategory">Cancel</button>
+        <button type="submit" class="primary" id="saveCategoryBtn">Save category</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Expense Modal -->
+<div class="overlay" id="expenseOverlay">
+  <div class="modal">
+    <h2 id="expenseModalTitle">Log an expense</h2>
+    <form id="expenseForm">
+      <input type="hidden" id="expenseEditId">
+      <div class="field">
+        <label for="expenseAmount">Amount</label>
+        <input type="number" id="expenseAmount" placeholder="0.00" min="0.01" step="0.01" required>
+      </div>
+      <div class="field">
+        <label for="expenseCategory">Category</label>
+        <select id="expenseCategory" required></select>
+      </div>
+      <div class="field">
+        <label for="expenseNote">Note</label>
+        <select id="expenseNote">
+          <option value="__new__">+ Add a new note…</option>
+        </select>
+        <input type="text" id="expenseNoteNew" placeholder="Type a note, e.g. Trader Joe's" style="display:none; margin-top:6px;">
+      </div>
+      <div class="field">
+        <label for="expenseDetails">Additional details <span class="hint">— optional, type anything</span></label>
+        <textarea id="expenseDetails" placeholder="Any extra detail about this expense…"></textarea>
+      </div>
+      <div class="field">
+        <label for="expenseDateInput">Date</label>
+        <input type="date" id="expenseDateInput">
+        <span class="hint" id="expenseDateHint">Added automatically</span>
+      </div>
+
+      <label class="checkbox-row" for="expenseRecurringToggle" id="expenseRecurringRow">
+        <input type="checkbox" id="expenseRecurringToggle">
+        <span>Make this a recurring expense</span>
+      </label>
+      <div class="recurring-fields" id="recurringFields">
+        <div class="row2">
+          <div class="field">
+            <label for="recurringFrequency">Frequency</label>
+            <select id="recurringFrequency">
+              <option value="weekly">Weekly</option>
+              <option value="biweekly">Bi-Weekly</option>
+              <option value="monthly" selected>Monthly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="semiannually">Semi-Annually</option>
+              <option value="annually">Annually</option>
+            </select>
+          </div>
+          <div class="field">
+            <label id="expenseDayLabel" for="recurringDay">Day of month</label>
+            <select id="expenseDayOfWeek" style="display:none;">
+              <option value="0">Sunday</option>
+              <option value="1">Monday</option>
+              <option value="2">Tuesday</option>
+              <option value="3">Wednesday</option>
+              <option value="4">Thursday</option>
+              <option value="5">Friday</option>
+              <option value="6">Saturday</option>
+            </select>
+            <input type="number" id="recurringDay" min="1" max="31" placeholder="e.g. 1">
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <span class="hint">This expense will be logged automatically on that schedule, from now on.</span>
+        </div>
+      </div>
+
+      <div class="field-error" id="expenseError">Add a category first, make sure the amount is greater than $0, and (if recurring) pick a valid day.</div>
+      <div class="modal-actions">
+        <button type="button" class="ghost" id="cancelExpense">Cancel</button>
+        <button type="submit" class="primary" id="saveExpenseBtn">Save expense</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Income Modal -->
+<div class="overlay" id="incomeOverlay">
+  <div class="modal">
+    <h2 id="incomeModalTitle">Log income</h2>
+    <form id="incomeForm">
+      <input type="hidden" id="incomeEditId">
+      <div class="field">
+        <label for="incomeAmount">Amount</label>
+        <input type="number" id="incomeAmount" placeholder="0.00" min="0.01" step="0.01" required>
+      </div>
+      <div class="field">
+        <label for="incomeCategory">Category</label>
+        <select id="incomeCategory" required></select>
+      </div>
+      <div class="field">
+        <label for="incomeNote">Note</label>
+        <select id="incomeNote">
+          <option value="__new__">+ Add a new note…</option>
+        </select>
+        <input type="text" id="incomeNoteNew" placeholder="e.g. Paycheck, Freelance client" style="display:none; margin-top:6px;">
+      </div>
+      <div class="field">
+        <label for="incomeDateInput">Date</label>
+        <input type="date" id="incomeDateInput">
+        <span class="hint" id="incomeDateHint">Added automatically</span>
+      </div>
+
+      <label class="checkbox-row" for="incomeRecurringToggle" id="incomeRecurringRow">
+        <input type="checkbox" id="incomeRecurringToggle">
+        <span>Make this a recurring income</span>
+      </label>
+      <div class="recurring-fields" id="incomeRecurringFields">
+        <div class="row2">
+          <div class="field">
+            <label for="incomeRecurringFrequency">Frequency</label>
+            <select id="incomeRecurringFrequency">
+              <option value="weekly">Weekly</option>
+              <option value="biweekly">Bi-Weekly</option>
+              <option value="monthly" selected>Monthly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="semiannually">Semi-Annually</option>
+              <option value="annually">Annually</option>
+            </select>
+          </div>
+          <div class="field">
+            <label id="incomeDayLabel" for="incomeRecurringDay">Day of month</label>
+            <select id="incomeDayOfWeek" style="display:none;">
+              <option value="0">Sunday</option>
+              <option value="1">Monday</option>
+              <option value="2">Tuesday</option>
+              <option value="3">Wednesday</option>
+              <option value="4">Thursday</option>
+              <option value="5">Friday</option>
+              <option value="6">Saturday</option>
+            </select>
+            <input type="number" id="incomeRecurringDay" min="1" max="31" placeholder="e.g. 1">
+          </div>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <span class="hint">This income will be logged automatically on that schedule, from now on.</span>
+        </div>
+      </div>
+
+      <div class="field-error" id="incomeError">Add an income category first, make sure the amount is greater than $0, and (if recurring) pick a valid day.</div>
+      <div class="modal-actions">
+        <button type="button" class="ghost" id="cancelIncome">Cancel</button>
+        <button type="submit" class="income-btn" id="saveIncomeBtn">Save income</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Recurring Modal -->
+<div class="overlay" id="recurringOverlay">
+  <div class="modal">
+    <h2>Recurring</h2>
+    <div class="field" style="margin-bottom:8px;"><label style="margin-bottom:0;">Expenses</label></div>
+    <div class="recurring-list" id="recurringList"></div>
+    <div class="field" style="margin:18px 0 8px;"><label style="margin-bottom:0;">Income</label></div>
+    <div class="recurring-list" id="recurringIncomeList"></div>
+    <div class="modal-actions">
+      <button type="button" class="ghost" id="closeRecurring">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'ledger-budget-data';
+  let data = { categories: [], expenses: [], recurring: [], income: [], recurringIncome: [] };
+  let currentMonth = new Date().toISOString().slice(0,7); // YYYY-MM
+  const openCards = new Set();
+  let categoryNoteDraft = [];
+  let selectedCategoryType = 'expense';
+  let editingExpenseId = null;
+  let editingIncomeId = null;
+
+  const FREQ_LABEL = {
+    weekly: 'Weekly',
+    biweekly: 'Bi-Weekly',
+    monthly: 'Monthly',
+    quarterly: 'Quarterly',
+    semiannually: 'Semi-Annually',
+    annually: 'Annually'
+  };
+  const FREQ_IS_WEEKLY = { weekly: true, biweekly: true };
+  const FREQ_DAYS = { weekly: 7, biweekly: 14 };
+  const FREQ_MONTHS = {
+    monthly: 1,
+    quarterly: 3,
+    semiannually: 6,
+    annually: 12
+  };
+  const WEEKDAY_LABEL = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  const fmt = (n) => {
+    const sign = n < 0 ? '-' : '';
+    return sign + '$' + Math.abs(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  };
+  const uid = () => Math.random().toString(36).slice(2,10) + Date.now().toString(36);
+  const pad2 = (n) => String(n).padStart(2, '0');
+
+  // ---- date helpers (plain y/m/d integers to avoid timezone issues) ----
+  function todayParts(){
+    const d = new Date();
+    return { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() };
+  }
+  function todayISO(){
+    const t = todayParts();
+    return `${t.y}-${pad2(t.m)}-${pad2(t.d)}`;
+  }
+  function parseISO(str){
+    const [y,m,d] = str.split('-').map(Number);
+    return { y, m, d };
+  }
+  function toISO(p){
+    return `${p.y}-${pad2(p.m)}-${pad2(p.d)}`;
+  }
+  function daysInMonth(y, m){
+    return new Date(y, m, 0).getDate(); // m is 1-based
+  }
+  function clampDay(y, m, d){
+    return Math.min(d, daysInMonth(y, m));
+  }
+  function addMonths(p, n){
+    const total = (p.m - 1) + n;
+    const newY = p.y + Math.floor(total / 12);
+    const newM = (total % 12) + 1;
+    return { y: newY, m: newM, d: clampDay(newY, newM, p.d) };
+  }
+  function addDays(p, n){
+    const dt = new Date(p.y, p.m - 1, p.d, 12, 0, 0);
+    dt.setDate(dt.getDate() + n);
+    return { y: dt.getFullYear(), m: dt.getMonth() + 1, d: dt.getDate() };
+  }
+  function monthOf(isoDate){ return isoDate.slice(0,7); }
+
+  function computeInitialDueDate(frequency, dayOfMonth, dayOfWeek){
+    if(FREQ_IS_WEEKLY[frequency]){
+      const t = todayParts();
+      const todayWeekday = new Date(t.y, t.m - 1, t.d, 12, 0, 0).getDay();
+      const diff = ((dayOfWeek - todayWeekday) + 7) % 7;
+      return addDays(t, diff);
+    }
+    const t = todayParts();
+    let candidate = { y: t.y, m: t.m, d: clampDay(t.y, t.m, dayOfMonth) };
+    if(toISO(candidate) >= todayISO()){
+      return candidate;
+    }
+    return addMonths(candidate, FREQ_MONTHS[frequency]);
+  }
+  function advanceDueDate(prevDueDateISO, frequency){
+    if(FREQ_IS_WEEKLY[frequency]){
+      return toISO(addDays(parseISO(prevDueDateISO), FREQ_DAYS[frequency]));
+    }
+    return toISO(addMonths(parseISO(prevDueDateISO), FREQ_MONTHS[frequency]));
+  }
+
+  // ---- storage (localStorage — persists in this browser, on this device) ----
+  function loadData(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        const parsed = JSON.parse(raw);
+        data.categories = (parsed.categories || []).map(c => ({ notes: [], type: 'expense', ...c }));
+        data.expenses = parsed.expenses || [];
+        data.recurring = parsed.recurring || [];
+        data.income = parsed.income || [];
+        data.recurringIncome = parsed.recurringIncome || [];
+      }
+    }catch(e){
+      console.error('Could not load saved data', e);
+      showToast('Could not load saved data — starting fresh.');
+    }
+    migrateLegacyIncome();
+  }
+
+  // Older versions stored income against a free-text "source" instead of a category.
+  // Fold any of that into a "General" income category so history isn't lost.
+  function migrateLegacyIncome(){
+    const legacyEntries = data.income.filter(i => !i.categoryId);
+    const legacyRecurring = data.recurringIncome.filter(r => !r.categoryId);
+    if(legacyEntries.length === 0 && legacyRecurring.length === 0) return;
+
+    let general = data.categories.find(c => c.type === 'income' && c.name === 'General');
+    if(!general){
+      general = { id: uid(), name: 'General', type: 'income', budget: 0, notes: [] };
+      data.categories.push(general);
+    }
+    legacyEntries.forEach(i => {
+      i.categoryId = general.id;
+      if(i.source && !i.note) i.note = i.source;
+      delete i.source;
+    });
+    legacyRecurring.forEach(r => {
+      r.categoryId = general.id;
+      if(r.source && !r.note) r.note = r.source;
+      delete r.source;
+    });
+    saveData();
+  }
+
+  function saveData(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }catch(e){
+      console.error('Could not save data', e);
+      showToast('Could not save — your browser storage may be full or blocked.');
+    }
+  }
+
+  let toastTimer;
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+  }
+
+  // ---- recurring generation ----
+  function generateDueExpenses(){
+    let changed = false;
+    const today = todayISO();
+    data.recurring.forEach(r => {
+      let guard = 0;
+      while(r.nextDueDate <= today && guard < 60){
+        data.expenses.push({
+          id: uid(), categoryId: r.categoryId, amount: r.amount,
+          note: r.note || '', details: '', date: r.nextDueDate, recurringId: r.id
+        });
+        r.nextDueDate = advanceDueDate(r.nextDueDate, r.frequency);
+        changed = true;
+        guard++;
+      }
+    });
+    if(changed) saveData();
+  }
+  function generateDueIncome(){
+    let changed = false;
+    const today = todayISO();
+    data.recurringIncome.forEach(r => {
+      let guard = 0;
+      while(r.nextDueDate <= today && guard < 60){
+        data.income.push({
+          id: uid(), categoryId: r.categoryId, amount: r.amount,
+          note: r.note || '', date: r.nextDueDate, recurringId: r.id
+        });
+        r.nextDueDate = advanceDueDate(r.nextDueDate, r.frequency);
+        changed = true;
+        guard++;
+      }
+    });
+    if(changed) saveData();
+  }
+
+  function setTodayLabel(){
+    const d = new Date();
+    document.getElementById('todayLabel').textContent = d.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+  }
+  function monthLabel(ym){
+    const [y,m] = ym.split('-').map(Number);
+    return new Date(y, m-1, 1).toLocaleDateString('en-US', { month:'long', year:'numeric' });
+  }
+  function entriesForCategoryMonth(list, catId, ym){
+    return list.filter(e => e.categoryId === catId && monthOf(e.date) === ym).sort((a,b) => b.date.localeCompare(a.date));
+  }
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // ---------- Main render ----------
+  function render(){
+    const expenseCats = data.categories.filter(c => c.type === 'expense');
+    const incomeCats = data.categories.filter(c => c.type === 'income');
+
+    let totalBudget = 0, totalSpent = 0;
+    expenseCats.forEach(cat => {
+      totalBudget += cat.budget;
+      totalSpent += entriesForCategoryMonth(data.expenses, cat.id, currentMonth).reduce((s,e)=>s+e.amount,0);
+    });
+    let totalIncome = 0;
+    incomeCats.forEach(cat => {
+      totalIncome += entriesForCategoryMonth(data.income, cat.id, currentMonth).reduce((s,i)=>s+i.amount,0);
+    });
+    const totalRemaining = totalBudget - totalSpent;
+    const net = totalIncome - totalSpent;
+
+    document.getElementById('totalBudget').textContent = fmt(totalBudget);
+    document.getElementById('totalSpent').textContent = fmt(totalSpent);
+    const remEl = document.getElementById('totalRemaining');
+    remEl.textContent = fmt(totalRemaining);
+    remEl.className = 'value ' + (totalRemaining < 0 ? 'negative' : 'positive');
+    document.getElementById('totalIncome').textContent = fmt(totalIncome);
+    const netEl = document.getElementById('totalNet');
+    netEl.textContent = fmt(net);
+    netEl.className = 'value ' + (net < 0 ? 'negative' : 'positive');
+
+    // Expense grid
+    const eGrid = document.getElementById('expenseGrid');
+    eGrid.innerHTML = '';
+    document.getElementById('expenseEmptyState').style.display = expenseCats.length === 0 ? 'block' : 'none';
+    expenseCats.forEach(cat => eGrid.appendChild(renderCard(cat)));
+
+    // Income grid
+    const iGrid = document.getElementById('incomeGrid');
+    iGrid.innerHTML = '';
+    document.getElementById('incomeEmptyState').style.display = incomeCats.length === 0 ? 'block' : 'none';
+    incomeCats.forEach(cat => iGrid.appendChild(renderCard(cat)));
+
+    populateCategorySelect(document.getElementById('expenseCategory'), 'expense', 'Create an expense category first');
+    populateCategorySelect(document.getElementById('incomeCategory'), 'income', 'Create an income category first');
+    populateNoteDropdown(document.getElementById('expenseNote'), document.getElementById('expenseCategory').value);
+    populateNoteDropdown(document.getElementById('incomeNote'), document.getElementById('incomeCategory').value);
+  }
+
+  function populateCategorySelect(sel, type, emptyLabel){
+    const prevVal = sel.value;
+    const cats = data.categories.filter(c => c.type === type);
+    sel.innerHTML = '';
+    if(cats.length === 0){
+      const opt = document.createElement('option');
+      opt.value = ''; opt.textContent = emptyLabel;
+      sel.appendChild(opt);
+    } else {
+      cats.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id; opt.textContent = c.name;
+        sel.appendChild(opt);
+      });
+      if(cats.some(c => c.id === prevVal)) sel.value = prevVal;
+    }
+  }
+
+  function populateNoteDropdown(noteSel, catId){
+    const cat = data.categories.find(c => c.id === catId);
+    const prevNote = noteSel.value;
+    noteSel.innerHTML = '';
+    (cat ? cat.notes : []).forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = n; opt.textContent = n;
+      noteSel.appendChild(opt);
+    });
+    const addOpt = document.createElement('option');
+    addOpt.value = '__new__';
+    addOpt.textContent = '+ Add a new note…';
+    noteSel.appendChild(addOpt);
+    if(cat && cat.notes.includes(prevNote)) noteSel.value = prevNote;
+  }
+
+  function renderCard(cat){
+    const isIncome = cat.type === 'income';
+    const list = isIncome ? data.income : data.expenses;
+    const entries = entriesForCategoryMonth(list, cat.id, currentMonth);
+    const total = entries.reduce((s,e)=>s+e.amount,0);
+    const isOpen = openCards.has(cat.id);
+
+    const card = document.createElement('div');
+    card.className = 'card' + (isIncome ? ' income-type' : '');
+
+    let metricsHtml = '';
+    if(isIncome){
+      const goalSet = cat.budget > 0;
+      if(goalSet){
+        const remaining = cat.budget - total;
+        const met = remaining <= 0;
+        const pct = Math.min(100, (total / cat.budget) * 100);
+        metricsHtml = `
+          ${met ? '<div class="stamp met">Goal met</div>' : ''}
+          <div class="amount-row">
+            <span>Goal: <b>${fmt(cat.budget)}</b></span>
+            <span>Received: <b>${fmt(total)}</b></span>
+          </div>
+          <div class="ruler"><div class="ruler-fill goal" style="width:${pct}%"></div></div>
+          <div class="remaining-line">
+            <span>${met ? 'Over goal by' : 'Left to reach goal'}</span>
+            <span class="amt ${met ? 'goal-met' : 'positive'}">${fmt(Math.abs(remaining))}</span>
+          </div>
+        `;
+      } else {
+        metricsHtml = `
+          <div class="amount-row">
+            <span>No monthly goal set</span>
+            <span>Received: <b>${fmt(total)}</b></span>
+          </div>
+        `;
+      }
+    } else {
+      const remaining = cat.budget - total;
+      const over = remaining < 0;
+      const pct = cat.budget > 0 ? Math.min(100, (total / cat.budget) * 100) : (total > 0 ? 100 : 0);
+      metricsHtml = `
+        ${over ? '<div class="stamp over">Over budget</div>' : ''}
+        <div class="amount-row">
+          <span>Budget: <b>${fmt(cat.budget)}</b></span>
+          <span>Spent: <b>${fmt(total)}</b></span>
+        </div>
+        <div class="ruler"><div class="ruler-fill ${over ? 'over' : ''}" style="width:${pct}%"></div></div>
+        <div class="remaining-line">
+          <span>Remaining in ${monthLabel(currentMonth)}</span>
+          <span class="amt ${over ? 'negative' : 'positive'}">${fmt(remaining)}</span>
+        </div>
+      `;
+    }
+
+    card.innerHTML = `
+      <div class="card-head">
+        <div class="cat-name">${escapeHtml(cat.name)}</div>
+        <div class="cat-actions">
+          <button class="icon-btn" data-action="edit-category" data-id="${cat.id}">Edit</button>
+          <button class="icon-btn" data-action="delete-category" data-id="${cat.id}">Delete</button>
+        </div>
+      </div>
+      ${metricsHtml}
+      <button class="link toggle-entries" data-id="${cat.id}">${isOpen ? 'Hide entries' : 'Show entries'} (${entries.length})</button>
+      <div class="entries ${isOpen ? 'open' : ''}">
+        ${entries.length === 0
+          ? `<div class="no-entries">No ${isIncome ? 'income' : 'expenses'} logged this month.</div>`
+          : entries.map(e => `
+            <div class="entry-row">
+              <span class="entry-date">${e.date.slice(5)}</span>
+              <span class="entry-note-wrap">
+                <span class="entry-note">${escapeHtml(e.note || '—')}${e.recurringId ? '<span class="recur-badge">↻ recurring</span>' : ''}</span>
+                ${e.details ? `<div class="entry-details">${escapeHtml(e.details)}</div>` : ''}
+              </span>
+              <span class="entry-actions">
+                <span class="entry-amt ${isIncome ? 'income' : ''}">${fmt(e.amount)}</span>
+                <button class="entry-edit" data-action="${isIncome ? 'edit-income' : 'edit-expense'}" data-id="${e.id}" title="Edit entry" aria-label="Edit entry">✎</button>
+                <button class="entry-del" data-action="${isIncome ? 'delete-income' : 'delete-expense'}" data-id="${e.id}" title="Delete entry" aria-label="Delete entry">✕</button>
+              </span>
+            </div>
+          `).join('')
+        }
+      </div>
+    `;
+    return card;
+  }
+
+  function scheduleText(r){
+    const when = FREQ_IS_WEEKLY[r.frequency] ? `on ${WEEKDAY_LABEL[r.dayOfWeek]}s` : `on day ${r.dayOfMonth}`;
+    return `${FREQ_LABEL[r.frequency]} · ${when} · next: ${r.nextDueDate}`;
+  }
+
+  function renderRecurringList(){
+    const list = document.getElementById('recurringList');
+    list.innerHTML = '';
+    if(data.recurring.length === 0){
+      list.innerHTML = '<div class="no-entries">No recurring expenses set up yet.</div>';
+    } else {
+      data.recurring.slice().sort((a,b) => a.nextDueDate.localeCompare(b.nextDueDate)).forEach(r => {
+        const cat = data.categories.find(c => c.id === r.categoryId);
+        const item = document.createElement('div');
+        item.className = 'recurring-item';
+        item.innerHTML = `
+          <div class="ri-main">
+            <div class="ri-cat">${escapeHtml(cat ? cat.name : 'Uncategorized')} — ${fmt(r.amount)}</div>
+            <div class="ri-meta">${scheduleText(r)}</div>
+            ${r.note ? `<div class="ri-note">${escapeHtml(r.note)}</div>` : ''}
+          </div>
+          <button class="icon-btn" data-action="delete-recurring" data-id="${r.id}">Cancel</button>
+        `;
+        list.appendChild(item);
+      });
+    }
+
+    const incList = document.getElementById('recurringIncomeList');
+    incList.innerHTML = '';
+    if(data.recurringIncome.length === 0){
+      incList.innerHTML = '<div class="no-entries">No recurring income set up yet.</div>';
+    } else {
+      data.recurringIncome.slice().sort((a,b) => a.nextDueDate.localeCompare(b.nextDueDate)).forEach(r => {
+        const cat = data.categories.find(c => c.id === r.categoryId);
+        const item = document.createElement('div');
+        item.className = 'recurring-item';
+        item.innerHTML = `
+          <div class="ri-main">
+            <div class="ri-cat">${escapeHtml(cat ? cat.name : 'Uncategorized')} — ${fmt(r.amount)}</div>
+            <div class="ri-meta">${scheduleText(r)}</div>
+            ${r.note ? `<div class="ri-note">${escapeHtml(r.note)}</div>` : ''}
+          </div>
+          <button class="icon-btn" data-action="delete-recurring-income" data-id="${r.id}">Cancel</button>
+        `;
+        incList.appendChild(item);
+      });
+    }
+  }
+
+  // ---------- Category modal ----------
+  const categoryOverlay = document.getElementById('categoryOverlay');
+  const categoryForm = document.getElementById('categoryForm');
+  const categoryError = document.getElementById('categoryError');
+  const categoryNoteInput = document.getElementById('categoryNoteInput');
+  const categoryNoteChips = document.getElementById('categoryNoteChips');
+  const categoryTypeToggle = document.getElementById('categoryTypeToggle');
+  const categoryBudgetLabel = document.getElementById('categoryBudgetLabel');
+  const categoryBudgetHint = document.getElementById('categoryBudgetHint');
+
+  function setCategoryType(type){
+    selectedCategoryType = type;
+    categoryTypeToggle.querySelectorAll('.type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
+    if(type === 'income'){
+      categoryBudgetLabel.textContent = 'Monthly goal';
+      categoryBudgetHint.textContent = "Optional — leave at $0 if you don't want to track a goal.";
+    } else {
+      categoryBudgetLabel.textContent = 'Monthly budget';
+      categoryBudgetHint.textContent = 'How much you plan to spend in this category each month.';
+    }
+  }
+  categoryTypeToggle.addEventListener('click', (e) => {
+    const btn = e.target.closest('.type-btn');
+    if(btn) setCategoryType(btn.dataset.type);
+  });
+
+  function renderCategoryChips(){
+    categoryNoteChips.innerHTML = '';
+    categoryNoteDraft.forEach((note, idx) => {
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      chip.innerHTML = `<span>${escapeHtml(note)}</span><button type="button" aria-label="Remove note" data-idx="${idx}">✕</button>`;
+      categoryNoteChips.appendChild(chip);
+    });
+  }
+  categoryNoteChips.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    categoryNoteDraft.splice(Number(btn.dataset.idx), 1);
+    renderCategoryChips();
+  });
+  function addDraftNote(){
+    const v = categoryNoteInput.value.trim();
+    if(v && !categoryNoteDraft.includes(v)){
+      categoryNoteDraft.push(v);
+      renderCategoryChips();
+    }
+    categoryNoteInput.value = '';
+    categoryNoteInput.focus();
+  }
+  document.getElementById('addCategoryNote').addEventListener('click', addDraftNote);
+  categoryNoteInput.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){ e.preventDefault(); addDraftNote(); }
+  });
+
+  function openCategoryModal(editCat){
+    categoryError.classList.remove('show');
+    categoryNoteInput.value = '';
+    if(editCat){
+      document.getElementById('categoryModalTitle').textContent = 'Edit category';
+      document.getElementById('categoryEditId').value = editCat.id;
+      document.getElementById('categoryName').value = editCat.name;
+      document.getElementById('categoryBudget').value = editCat.budget;
+      categoryNoteDraft = (editCat.notes || []).slice();
+      setCategoryType(editCat.type);
+      document.getElementById('saveCategoryBtn').textContent = 'Save changes';
+    } else {
+      document.getElementById('categoryModalTitle').textContent = 'New category';
+      document.getElementById('categoryEditId').value = '';
+      categoryForm.reset();
+      categoryNoteDraft = [];
+      setCategoryType('expense');
+      document.getElementById('saveCategoryBtn').textContent = 'Save category';
+    }
+    renderCategoryChips();
+    categoryOverlay.classList.add('open');
+    document.getElementById('categoryName').focus();
+  }
+  function closeCategoryModal(){ categoryOverlay.classList.remove('open'); }
+
+  document.getElementById('openCategoryModal').addEventListener('click', () => openCategoryModal(null));
+  document.getElementById('cancelCategory').addEventListener('click', closeCategoryModal);
+  categoryOverlay.addEventListener('click', (e) => { if(e.target === categoryOverlay) closeCategoryModal(); });
+
+  categoryForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = document.getElementById('categoryName').value.trim();
+    const budget = parseFloat(document.getElementById('categoryBudget').value);
+    if(!name || isNaN(budget) || budget < 0){
+      categoryError.classList.add('show');
+      return;
+    }
+    categoryError.classList.remove('show');
+    const editId = document.getElementById('categoryEditId').value;
+    if(editId){
+      const cat = data.categories.find(c => c.id === editId);
+      if(cat){ cat.name = name; cat.budget = budget; cat.notes = categoryNoteDraft.slice(); cat.type = selectedCategoryType; }
+    } else {
+      data.categories.push({ id: uid(), name, budget, notes: categoryNoteDraft.slice(), type: selectedCategoryType });
+    }
+    saveData();
+    closeCategoryModal();
+    render();
+  });
+
+  // ---------- Expense modal ----------
+  const expenseOverlay = document.getElementById('expenseOverlay');
+  const expenseForm = document.getElementById('expenseForm');
+  const expenseError = document.getElementById('expenseError');
+  const expenseCategorySelect = document.getElementById('expenseCategory');
+  const noteSelect = document.getElementById('expenseNote');
+  const noteNewInput = document.getElementById('expenseNoteNew');
+  const recurringToggle = document.getElementById('expenseRecurringToggle');
+  const recurringFields = document.getElementById('recurringFields');
+  const expenseRecurringRow = document.getElementById('expenseRecurringRow');
+  const expenseDateInput = document.getElementById('expenseDateInput');
+  const expenseDateHint = document.getElementById('expenseDateHint');
+
+  const expenseFrequencySelect = document.getElementById('recurringFrequency');
+  const expenseDayOfWeekSelect = document.getElementById('expenseDayOfWeek');
+  const expenseDayOfMonthInput = document.getElementById('recurringDay');
+  const expenseDayLabel = document.getElementById('expenseDayLabel');
+  function updateExpenseDayFieldVisibility(){
+    const isWeekly = FREQ_IS_WEEKLY[expenseFrequencySelect.value];
+    expenseDayOfWeekSelect.style.display = isWeekly ? 'block' : 'none';
+    expenseDayOfMonthInput.style.display = isWeekly ? 'none' : 'block';
+    expenseDayLabel.textContent = isWeekly ? 'Day of week' : 'Day of month';
+  }
+  expenseFrequencySelect.addEventListener('change', updateExpenseDayFieldVisibility);
+  updateExpenseDayFieldVisibility();
+
+  function openExpenseModal(editExpense){
+    expenseError.classList.remove('show');
+    expenseForm.reset();
+    noteNewInput.style.display = 'none';
+    recurringFields.classList.remove('open');
+    render();
+
+    if(editExpense){
+      editingExpenseId = editExpense.id;
+      document.getElementById('expenseModalTitle').textContent = 'Edit expense';
+      document.getElementById('saveExpenseBtn').textContent = 'Save changes';
+      document.getElementById('expenseAmount').value = editExpense.amount;
+      expenseCategorySelect.value = editExpense.categoryId;
+      populateNoteDropdown(noteSelect, editExpense.categoryId);
+      const cat = data.categories.find(c => c.id === editExpense.categoryId);
+      if(cat && cat.notes.includes(editExpense.note)){
+        noteSelect.value = editExpense.note;
+      } else if(editExpense.note){
+        noteSelect.value = '__new__';
+        noteNewInput.value = editExpense.note;
+        noteNewInput.style.display = 'block';
+      }
+      document.getElementById('expenseDetails').value = editExpense.details || '';
+      expenseDateInput.value = editExpense.date;
+      expenseDateInput.disabled = false;
+      expenseDateHint.textContent = 'You can adjust this if it was logged on the wrong day.';
+      expenseRecurringRow.style.display = 'none';
+      recurringFields.classList.remove('open');
+    } else {
+      editingExpenseId = null;
+      document.getElementById('expenseModalTitle').textContent = 'Log an expense';
+      document.getElementById('saveExpenseBtn').textContent = 'Save expense';
+      expenseDateInput.value = todayISO();
+      expenseDateInput.disabled = true;
+      expenseDateHint.textContent = 'Added automatically';
+      expenseRecurringRow.style.display = 'flex';
+      recurringToggle.checked = false;
+    }
+    expenseOverlay.classList.add('open');
+    document.getElementById('expenseAmount').focus();
+  }
+  function closeExpenseModal(){ expenseOverlay.classList.remove('open'); editingExpenseId = null; }
+
+  document.getElementById('openExpenseModal').addEventListener('click', () => openExpenseModal(null));
+  document.getElementById('cancelExpense').addEventListener('click', closeExpenseModal);
+  expenseOverlay.addEventListener('click', (e) => { if(e.target === expenseOverlay) closeExpenseModal(); });
+
+  expenseCategorySelect.addEventListener('change', () => {
+    noteSelect.value = '__new__';
+    noteNewInput.style.display = 'none';
+    noteNewInput.value = '';
+    populateNoteDropdown(noteSelect, expenseCategorySelect.value);
+  });
+  noteSelect.addEventListener('change', () => {
+    noteNewInput.style.display = noteSelect.value === '__new__' ? 'block' : 'none';
+    if(noteSelect.value === '__new__') noteNewInput.focus();
+  });
+  recurringToggle.addEventListener('change', () => {
+    recurringFields.classList.toggle('open', recurringToggle.checked);
+  });
+
+  expenseForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const amount = parseFloat(document.getElementById('expenseAmount').value);
+    const categoryId = expenseCategorySelect.value;
+    const details = document.getElementById('expenseDetails').value.trim();
+    const date = expenseDateInput.value || todayISO();
+    let note = noteSelect.value;
+    if(note === '__new__') note = noteNewInput.value.trim();
+
+    const isRecurring = !editingExpenseId && recurringToggle.checked;
+    const frequency = expenseFrequencySelect.value;
+    const isWeeklyFreq = FREQ_IS_WEEKLY[frequency];
+    const dayOfMonth = parseInt(expenseDayOfMonthInput.value, 10);
+    const dayOfWeek = parseInt(expenseDayOfWeekSelect.value, 10);
+
+    const basicsInvalid = !categoryId || isNaN(amount) || amount <= 0;
+    const recurringInvalid = isRecurring && !isWeeklyFreq && (isNaN(dayOfMonth) || dayOfMonth < 1 || dayOfMonth > 31);
+    if(basicsInvalid || recurringInvalid){
+      expenseError.classList.add('show');
+      return;
+    }
+    expenseError.classList.remove('show');
+
+    const cat = data.categories.find(c => c.id === categoryId);
+    if(note && cat && !cat.notes.includes(note)) cat.notes.push(note);
+
+    if(editingExpenseId){
+      const ex = data.expenses.find(x => x.id === editingExpenseId);
+      if(ex){ ex.amount = amount; ex.categoryId = categoryId; ex.note = note; ex.details = details; ex.date = date; }
+      saveData();
+    } else if(isRecurring){
+      const nextDueDate = toISO(computeInitialDueDate(frequency, dayOfMonth, dayOfWeek));
+      data.recurring.push({ id: uid(), categoryId, amount, note, frequency, dayOfMonth: isWeeklyFreq ? null : dayOfMonth, dayOfWeek: isWeeklyFreq ? dayOfWeek : null, nextDueDate });
+      saveData();
+      generateDueExpenses();
+    } else {
+      data.expenses.push({ id: uid(), categoryId, amount, note, details, date });
+      saveData();
+    }
+
+    currentMonth = monthOf(date);
+    document.getElementById('monthInput').value = currentMonth;
+    closeExpenseModal();
+    render();
+  });
+
+  // ---------- Income modal ----------
+  const incomeOverlay = document.getElementById('incomeOverlay');
+  const incomeForm = document.getElementById('incomeForm');
+  const incomeError = document.getElementById('incomeError');
+  const incomeCategorySelect = document.getElementById('incomeCategory');
+  const incomeNoteSelect = document.getElementById('incomeNote');
+  const incomeNoteNew = document.getElementById('incomeNoteNew');
+  const incomeRecurringToggle = document.getElementById('incomeRecurringToggle');
+  const incomeRecurringFields = document.getElementById('incomeRecurringFields');
+  const incomeRecurringRow = document.getElementById('incomeRecurringRow');
+  const incomeDateInput = document.getElementById('incomeDateInput');
+  const incomeDateHint = document.getElementById('incomeDateHint');
+  const incomeFrequencySelect = document.getElementById('incomeRecurringFrequency');
+  const incomeDayOfWeekSelect = document.getElementById('incomeDayOfWeek');
+  const incomeDayOfMonthInput = document.getElementById('incomeRecurringDay');
+  const incomeDayLabel = document.getElementById('incomeDayLabel');
+
+  function updateIncomeDayFieldVisibility(){
+    const isWeekly = FREQ_IS_WEEKLY[incomeFrequencySelect.value];
+    incomeDayOfWeekSelect.style.display = isWeekly ? 'block' : 'none';
+    incomeDayOfMonthInput.style.display = isWeekly ? 'none' : 'block';
+    incomeDayLabel.textContent = isWeekly ? 'Day of week' : 'Day of month';
+  }
+  incomeFrequencySelect.addEventListener('change', updateIncomeDayFieldVisibility);
+  updateIncomeDayFieldVisibility();
+  incomeRecurringToggle.addEventListener('change', () => {
+    incomeRecurringFields.classList.toggle('open', incomeRecurringToggle.checked);
+  });
+
+  function openIncomeModal(editIncome){
+    incomeError.classList.remove('show');
+    incomeForm.reset();
+    incomeNoteNew.style.display = 'none';
+    incomeRecurringFields.classList.remove('open');
+    render();
+
+    if(editIncome){
+      editingIncomeId = editIncome.id;
+      document.getElementById('incomeModalTitle').textContent = 'Edit income';
+      document.getElementById('saveIncomeBtn').textContent = 'Save changes';
+      document.getElementById('incomeAmount').value = editIncome.amount;
+      incomeCategorySelect.value = editIncome.categoryId;
+      populateNoteDropdown(incomeNoteSelect, editIncome.categoryId);
+      const cat = data.categories.find(c => c.id === editIncome.categoryId);
+      if(cat && cat.notes.includes(editIncome.note)){
+        incomeNoteSelect.value = editIncome.note;
+      } else if(editIncome.note){
+        incomeNoteSelect.value = '__new__';
+        incomeNoteNew.value = editIncome.note;
+        incomeNoteNew.style.display = 'block';
+      }
+      incomeDateInput.value = editIncome.date;
+      incomeDateInput.disabled = false;
+      incomeDateHint.textContent = 'You can adjust this if it was logged on the wrong day.';
+      incomeRecurringRow.style.display = 'none';
+      incomeRecurringFields.classList.remove('open');
+    } else {
+      editingIncomeId = null;
+      document.getElementById('incomeModalTitle').textContent = 'Log income';
+      document.getElementById('saveIncomeBtn').textContent = 'Save income';
+      incomeDateInput.value = todayISO();
+      incomeDateInput.disabled = true;
+      incomeDateHint.textContent = 'Added automatically';
+      incomeRecurringRow.style.display = 'flex';
+      incomeRecurringToggle.checked = false;
+    }
+    incomeOverlay.classList.add('open');
+    document.getElementById('incomeAmount').focus();
+  }
+  function closeIncomeModal(){ incomeOverlay.classList.remove('open'); editingIncomeId = null; }
+
+  document.getElementById('openIncomeModal').addEventListener('click', () => openIncomeModal(null));
+  document.getElementById('cancelIncome').addEventListener('click', closeIncomeModal);
+  incomeOverlay.addEventListener('click', (e) => { if(e.target === incomeOverlay) closeIncomeModal(); });
+
+  incomeCategorySelect.addEventListener('change', () => {
+    incomeNoteSelect.value = '__new__';
+    incomeNoteNew.style.display = 'none';
+    incomeNoteNew.value = '';
+    populateNoteDropdown(incomeNoteSelect, incomeCategorySelect.value);
+  });
+  incomeNoteSelect.addEventListener('change', () => {
+    incomeNoteNew.style.display = incomeNoteSelect.value === '__new__' ? 'block' : 'none';
+    if(incomeNoteSelect.value === '__new__') incomeNoteNew.focus();
+  });
+
+  incomeForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const amount = parseFloat(document.getElementById('incomeAmount').value);
+    const categoryId = incomeCategorySelect.value;
+    const date = incomeDateInput.value || todayISO();
+    let note = incomeNoteSelect.value;
+    if(note === '__new__') note = incomeNoteNew.value.trim();
+
+    const isRecurring = !editingIncomeId && incomeRecurringToggle.checked;
+    const frequency = incomeFrequencySelect.value;
+    const isWeeklyFreq = FREQ_IS_WEEKLY[frequency];
+    const dayOfMonth = parseInt(incomeDayOfMonthInput.value, 10);
+    const dayOfWeek = parseInt(incomeDayOfWeekSelect.value, 10);
+
+    const basicsInvalid = !categoryId || isNaN(amount) || amount <= 0;
+    const recurringInvalid = isRecurring && !isWeeklyFreq && (isNaN(dayOfMonth) || dayOfMonth < 1 || dayOfMonth > 31);
+    if(basicsInvalid || recurringInvalid){
+      incomeError.classList.add('show');
+      return;
+    }
+    incomeError.classList.remove('show');
+
+    const cat = data.categories.find(c => c.id === categoryId);
+    if(note && cat && !cat.notes.includes(note)) cat.notes.push(note);
+
+    if(editingIncomeId){
+      const inc = data.income.find(x => x.id === editingIncomeId);
+      if(inc){ inc.amount = amount; inc.categoryId = categoryId; inc.note = note; inc.date = date; }
+      saveData();
+    } else if(isRecurring){
+      const nextDueDate = toISO(computeInitialDueDate(frequency, dayOfMonth, dayOfWeek));
+      data.recurringIncome.push({ id: uid(), categoryId, amount, note, frequency, dayOfMonth: isWeeklyFreq ? null : dayOfMonth, dayOfWeek: isWeeklyFreq ? dayOfWeek : null, nextDueDate });
+      saveData();
+      generateDueIncome();
+    } else {
+      data.income.push({ id: uid(), categoryId, amount, note, date });
+      saveData();
+    }
+
+    currentMonth = monthOf(date);
+    document.getElementById('monthInput').value = currentMonth;
+    closeIncomeModal();
+    render();
+  });
+
+  // ---------- Recurring modal ----------
+  const recurringOverlay = document.getElementById('recurringOverlay');
+  document.getElementById('openRecurringModal').addEventListener('click', () => {
+    renderRecurringList();
+    recurringOverlay.classList.add('open');
+  });
+  document.getElementById('closeRecurring').addEventListener('click', () => recurringOverlay.classList.remove('open'));
+  recurringOverlay.addEventListener('click', (e) => { if(e.target === recurringOverlay) recurringOverlay.classList.remove('open'); });
+  document.getElementById('recurringList').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if(!btn || btn.dataset.action !== 'delete-recurring') return;
+    if(confirm('Cancel this recurring expense? Past logged entries will stay, but no new ones will be created.')){
+      data.recurring = data.recurring.filter(r => r.id !== btn.dataset.id);
+      saveData();
+      renderRecurringList();
+    }
+  });
+  document.getElementById('recurringIncomeList').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if(!btn || btn.dataset.action !== 'delete-recurring-income') return;
+    if(confirm('Cancel this recurring income? Past logged entries will stay, but no new ones will be created.')){
+      data.recurringIncome = data.recurringIncome.filter(r => r.id !== btn.dataset.id);
+      saveData();
+      renderRecurringList();
+    }
+  });
+
+  // ---------- Shared card / entry click delegation ----------
+  function handleCardAreaClick(e){
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    const action = btn.dataset.action;
+    const id = btn.dataset.id;
+
+    if(action === 'edit-category'){
+      const cat = data.categories.find(c => c.id === id);
+      if(cat) openCategoryModal(cat);
+    } else if(action === 'delete-category'){
+      const cat = data.categories.find(c => c.id === id);
+      if(!cat) return;
+      const isIncome = cat.type === 'income';
+      const entryCount = (isIncome ? data.income : data.expenses).filter(x => x.categoryId === id).length;
+      const recurCount = (isIncome ? data.recurringIncome : data.recurring).filter(r => r.categoryId === id).length;
+      let msg = `Delete "${cat.name}"?`;
+      if(entryCount > 0) msg += ` This also removes ${entryCount} logged ${isIncome ? 'income entry' : 'expense'}${entryCount === 1 ? '' : (isIncome ? ' entries' : 's')}.`;
+      if(recurCount > 0) msg += ` ${recurCount} recurring item${recurCount === 1 ? '' : 's'} tied to it will be cancelled.`;
+      if(confirm(msg)){
+        data.categories = data.categories.filter(c => c.id !== id);
+        if(isIncome){
+          data.income = data.income.filter(x => x.categoryId !== id);
+          data.recurringIncome = data.recurringIncome.filter(r => r.categoryId !== id);
+        } else {
+          data.expenses = data.expenses.filter(x => x.categoryId !== id);
+          data.recurring = data.recurring.filter(r => r.categoryId !== id);
+        }
+        saveData();
+        render();
+      }
+    } else if(action === 'delete-expense'){
+      if(confirm('Delete this expense entry?')){
+        data.expenses = data.expenses.filter(x => x.id !== id);
+        saveData();
+        render();
+      }
+    } else if(action === 'delete-income'){
+      if(confirm('Delete this income entry?')){
+        data.income = data.income.filter(x => x.id !== id);
+        saveData();
+        render();
+      }
+    } else if(action === 'edit-expense'){
+      const ex = data.expenses.find(x => x.id === id);
+      if(ex) openExpenseModal(ex);
+    } else if(action === 'edit-income'){
+      const inc = data.income.find(x => x.id === id);
+      if(inc) openIncomeModal(inc);
+    } else if(btn.classList.contains('toggle-entries')){
+      if(openCards.has(id)) openCards.delete(id); else openCards.add(id);
+      render();
+    }
+  }
+  document.getElementById('expenseGrid').addEventListener('click', handleCardAreaClick);
+  document.getElementById('incomeGrid').addEventListener('click', handleCardAreaClick);
+
+  // ---------- Month picker ----------
+  const monthInput = document.getElementById('monthInput');
+  monthInput.value = currentMonth;
+  monthInput.addEventListener('change', () => {
+    if(monthInput.value){
+      currentMonth = monthInput.value;
+      render();
+    }
+  });
+
+  // ---------- PWA install prompt ----------
+  let deferredInstallPrompt = null;
+  const installBtn = document.getElementById('installBtn');
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    installBtn.style.display = 'inline-flex';
+  });
+  installBtn.addEventListener('click', async () => {
+    if(!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    installBtn.style.display = 'none';
+  });
+  window.addEventListener('appinstalled', () => {
+    installBtn.style.display = 'none';
+    showToast('Ledger installed. Find it on your home screen.');
+  });
+
+  // ---------- Service worker registration ----------
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch((err) => {
+        console.warn('Service worker registration failed:', err);
+      });
+    });
+  }
+
+  // ---------- Init ----------
+  (function init(){
+    setTodayLabel();
+    loadData();
+    generateDueExpenses();
+    generateDueIncome();
+    render();
+  })();
+})();
+</script>
+</body>
+</html>
